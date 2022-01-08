@@ -151,9 +151,9 @@ def follow_index(request):
 
 @login_required
 def profile_follow(request, username):
-    # Подписаться на автора    
+    # Подписаться на автора
     template = reverse('posts:profile', args=((username,)))
-    user = request.user    
+    user = request.user
     author = get_object_or_404(User, username=username)
     follows_list = user.follower.all().values_list('author', flat=True)
     if user != author and author.id not in follows_list:
