@@ -13,9 +13,7 @@
     <div class="container py-5">
       {% include 'posts/includes/switcher.html' %}             
       <h1>Лента подписок</h1> <br>
-      <article>
-      {% load cache %}
-      {% cache 20 follow_page %}
+      <article>      
       {% for post in page_obj %}
         <ul>
           <li>
@@ -34,9 +32,8 @@
           <a href = "{% url 'posts:group_list' post.group.slug %}"> Другие записи группы  "{{ post.group.title }}" </a>
         {% endif %}
         {% if not forloop.last %} <hr> {% endif %}
-        {% endfor %}
-        {% include 'posts/includes/paginator.html' %}
-      {% endcache %}  
+      {% endfor %}
+      {% include 'posts/includes/paginator.html' %}        
       </article>  
       <!-- под последним постом нет линии -->
     </div> 

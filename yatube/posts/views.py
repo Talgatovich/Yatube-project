@@ -56,11 +56,13 @@ def profile(request, username):
             following = False
     else:
         following = None
+    followers_count = author.following.count()
     context = {
         'post_count': post_count,
         'author': author,
         'page_obj': page_obj,
-        'following': following
+        'following': following,
+        'followers_count': followers_count
 
     }
     return render(request, 'posts/profile.html', context)

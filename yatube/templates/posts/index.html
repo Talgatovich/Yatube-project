@@ -15,7 +15,7 @@
       <h1>Последние обновления на сайте</h1> <br>
       <article>
       {% load cache %}
-        {% cache 20 index_page page_obj.number %}      
+      {% cache 20 index_page page_obj.number %}      
         {% for post in page_obj %}        
           <ul>
             <li>
@@ -35,8 +35,8 @@
           {% endif %}
           {% if not forloop.last %} <hr> {% endif %}        
         {% endfor %}   
-        {% endcache %}     
-        {% include 'posts/includes/paginator.html' %}
+      {% endcache %}     
+      {% include 'posts/includes/paginator.html' %}
          
       </article>  
       <!-- под последним постом нет линии -->
