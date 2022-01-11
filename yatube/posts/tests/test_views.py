@@ -1,3 +1,5 @@
+from http import HTTPStatus
+
 from django import forms
 from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
@@ -8,6 +10,8 @@ from posts.models import Group, Post  # isort:skip
 from posts.tests.utils import divide  # isort:skip
 
 FIRST_PAGE_POSTS_COUNT = 10
+OK = HTTPStatus.OK
+REDIRECT = HTTPStatus.FOUND
 
 User = get_user_model()
 
@@ -214,37 +218,6 @@ class PostViewsTests(TestCase):
         self.assertEqual(profile_page_obj.text, self.base_post_text)
         self.assertNotIn(another_group_page_obj.text, self.base_post_text)
 
-    def test_authorized_client_can_create_delete_follower(self):
-        """
-        Проверяем, что авторизованный пользователь может
-        подписываться на других пользователей
-        и удалять их из подписок.
-        Запись пользователя появляется в ленте тех,
-        кто на него подписан и не появляется в ленте тех, кто не подписан.
-        """
-        author_user_name = self.post.author
-        first_cnt = self.second_user.following.count()
-        self.authorized_client.get(reverse(
-            'posts:profile_follow', args=((author_user_name,))))  # Подписались
-        # на автора
-        second_cnt = self.second_user.following.count()
-        response = self.authorized_client.get(
-            reverse('posts:follow_index')  # Перешли в ленту подписок
-        )
-
-        self.assertEqual(second_cnt, first_cnt + 1)
-        self.assertContains(response, self.post)  # Пост автора, на которого
-        # мы подписаны есть в ленте
-        self.assertNotContains(response, self.post_with_group)  # Поста автора,
-        # на которого мы не подписаны в ленте нет
-
-        # Отписались от автора
-        self.authorized_client.get(reverse(
-            'posts:profile_unfollow', args=((author_user_name,))))
-        third_cnt = self.second_user.following.count()
-
-        self.assertEqual(third_cnt, first_cnt)
-
 
 class PaginatorViewsTest(TestCase):
     @classmethod
@@ -355,3 +328,112 @@ class PaginatorViewsTest(TestCase):
 
         self.assertEqual(len(page_obj), FIRST_PAGE_POSTS_COUNT)
         self.assertEqual(len(second_page_obj), remainder)
+
+
+class FollowViewsTest(TestCase):
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.authorized_client = Client()
+        cls.first_user = User.objects.create_user(username='JustUser')
+        cls.authorized_client.force_login(cls.first_user)
+
+        cls.favorite_author = Client()  # Создадим ибранного автора
+        cls.second_user = User.objects.create_user(username='FavoriteAuthor')
+        cls.favorite_author.force_login(cls.second_user)
+
+        cls.another_client = Client()
+        cls.third_user = User.objects.create_user(username='AnotherUser')
+        cls.another_client.force_login(cls.third_user)
+
+    def setUp(self):
+        self.post = Post.objects.create(
+            text='Пост от избранного автора',
+            author=self.second_user
+        )
+
+        self.author_user_name = self.post.author
+        self.first_cnt_client = self.first_user.follower.count()
+        self.first_cnt_author = self.author_user_name.following.count()
+
+        #  Авторизованный клиент подписывается на автора
+        self.response = self.authorized_client.get(reverse(
+            'posts:profile_follow', args=((self.author_user_name,))))
+
+    def test_authorized_client_can_create_follower(self):
+        """
+        Проверка, что авторизованный клиент
+        может подписаться
+        """
+        second_cnt_client = self.first_user.follower.count()
+        second_cnt_author = self.author_user_name.following.count()
+
+        self.assertEqual(self.response.status_code, REDIRECT)
+        self.assertEqual(second_cnt_client, self.first_cnt_client + 1)
+        self.assertEqual(second_cnt_author, self.first_cnt_author + 1)
+
+    def test_authorized_client_can_delete_follower(self):
+        """
+        Проверка, что авторизованный клиент
+        может отписаться
+        """
+        #  Начальное количество подписок и подписчиков
+        second_cnt_client = self.first_user.follower.count()
+        second_cnt_author = self.author_user_name.following.count()
+        #  Отписались от автора
+        self.authorized_client.get(reverse(
+            'posts:profile_unfollow', args=((self.author_user_name,))))
+        #  Конечное количество подписок и подписчиков
+        third_cnt_client = self.first_user.follower.count()
+        third_cnt_author = self.author_user_name.following.count()
+
+        self.assertEqual(self.response.status_code, REDIRECT)
+        self.assertEqual(third_cnt_client, second_cnt_client - 1)
+        self.assertEqual(third_cnt_author, second_cnt_author - 1)
+
+    def test_authorized_client_have_favorite_posts(self):
+        """
+        Проверяем, что у подписанного пользователя
+        появляется пост в ленте
+        """
+        form_data = {
+            'text': 'Новый избранный пост',
+            'author': self.second_user
+        }
+        self.favorite_author.post(
+            reverse('posts:post_create'),
+            data=form_data,
+            follow=True
+        )
+
+        response = self.authorized_client.get(
+            reverse('posts:follow_index'))  # Перешли в ленту подписок
+
+        post_text = response.context['page_obj'][0].text
+
+        self.assertEqual(post_text, form_data['text'])
+
+    def test_another_client_doesnot_have_favorite_posts(self):
+        """
+        Проверяем, что у неподписанного пользователя
+        пост в ленте не появляется
+        """
+        form_data = {
+            'text': 'Еще один избранный пост',
+            'author': self.second_user
+        }
+        self.favorite_author.post(
+            reverse('posts:post_create'),
+            data=form_data,
+            follow=True
+        )
+
+        response = self.another_client.get(
+            reverse('posts:follow_index'))  # Перешли в ленту подписок
+        post_text = Post.objects.all().first().text
+
+        #  Проверили, что пост создался
+        self.assertEqual(post_text, form_data['text'])
+        #  Проверили, что поста нет в ленте
+        self.assertNotContains(response, post_text)

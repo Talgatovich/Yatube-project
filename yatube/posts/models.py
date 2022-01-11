@@ -9,13 +9,17 @@ class Group(models.Model):
     slug = models.SlugField(unique=True)
     description = models.TextField()
 
+    class Meta:
+        verbose_name = 'Группа'
+        verbose_name_plural = 'Группы'
+
     def __str__(self) -> str:
         return self.title
 
 
 class Post(models.Model):
-    text = models.TextField(help_text='Начните вводить текст здесь')
-    pub_date = models.DateTimeField(auto_now_add=True)
+    text = models.TextField('Текст', help_text='Начните вводить текст здесь')
+    pub_date = models.DateTimeField('Дата публикации', auto_now_add=True)
     author = models.ForeignKey(
         User,
         blank=True,
@@ -70,6 +74,8 @@ class Comment(models.Model):
 
     class Meta:
         ordering = ['-created']
+        verbose_name = 'Комментарий'
+        verbose_name_plural = 'Комментарии'
 
 
 class Follow(models.Model):
@@ -89,3 +95,7 @@ class Follow(models.Model):
         related_name='following',
         verbose_name='Подписка'
     )
+
+    class Meta:
+        verbose_name = 'Подписка'
+        verbose_name_plural = 'Подписки'
