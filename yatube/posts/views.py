@@ -49,8 +49,8 @@ def profile(request, username):
     user = request.user
     page_obj = pagination(request, post_list, PAGE_COEF)
     if user.is_authenticated:
-        follows_list = user.follower.all().values_list('author', flat=True)
-        if author.id in follows_list:
+        authors = Follow.objects.filter(author=author)
+        if authors.exists():
             following = True
         else:
             following = False
@@ -157,8 +157,8 @@ def profile_follow(request, username):
     template = reverse('posts:profile', args=((username,)))
     user = request.user
     author = get_object_or_404(User, username=username)
-    follows_list = user.follower.all().values_list('author', flat=True)
-    if user != author and author.id not in follows_list:
+    exist = Follow.objects.filter(author=author).exists()
+    if user != author and not exist:
         Follow.objects.create(user=user, author=author)
     return redirect(template)
 
