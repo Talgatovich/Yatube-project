@@ -6,7 +6,7 @@ from django.db.models.query import QuerySet
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from posts.models import Group, Post  # isort:skip
+from posts.models import Group, Post, Follow  # isort:skip
 from posts.tests.utils import divide  # isort:skip
 
 FIRST_PAGE_POSTS_COUNT = 10
@@ -368,7 +368,11 @@ class FollowViewsTest(TestCase):
         """
         second_cnt_client = self.first_user.follower.count()
         second_cnt_author = self.author_user_name.following.count()
+        exist = Follow.objects.filter(
+            author=self.second_user, user=self.first_user
+        ).exists()
 
+        self.assertTrue(exist)
         self.assertEqual(self.response.status_code, REDIRECT)
         self.assertEqual(second_cnt_client, self.first_cnt_client + 1)
         self.assertEqual(second_cnt_author, self.first_cnt_author + 1)
@@ -387,7 +391,11 @@ class FollowViewsTest(TestCase):
         #  Конечное количество подписок и подписчиков
         third_cnt_client = self.first_user.follower.count()
         third_cnt_author = self.author_user_name.following.count()
+        exist = Follow.objects.filter(
+            author=self.second_user, user=self.first_user
+        ).exists()
 
+        self.assertFalse(exist)
         self.assertEqual(self.response.status_code, REDIRECT)
         self.assertEqual(third_cnt_client, second_cnt_client - 1)
         self.assertEqual(third_cnt_author, second_cnt_author - 1)

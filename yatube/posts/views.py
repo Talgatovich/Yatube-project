@@ -49,7 +49,7 @@ def profile(request, username):
     user = request.user
     page_obj = pagination(request, post_list, PAGE_COEF)
     if user.is_authenticated:
-        authors = Follow.objects.filter(author=author)
+        authors = Follow.objects.filter(author=author, user=user)
         if authors.exists():
             following = True
         else:
@@ -140,8 +140,9 @@ def add_comment(request, post_id):
 @login_required
 def follow_index(request):
     # информация о текущем пользователе доступна в переменной request.user
-    authors = request.user.follower.all().values('author')
-    following_posts = Post.objects.all().filter(author__in=authors)
+    following_posts = Post.objects.all().filter(
+        author__following__user=request.user
+    )
     template = 'posts/follow.html'
     page_obj = pagination(request, following_posts, PAGE_COEF)
     context = {
@@ -157,7 +158,7 @@ def profile_follow(request, username):
     template = reverse('posts:profile', args=((username,)))
     user = request.user
     author = get_object_or_404(User, username=username)
-    exist = Follow.objects.filter(author=author).exists()
+    exist = Follow.objects.filter(author=author, user=user).exists()
     if user != author and not exist:
         Follow.objects.create(user=user, author=author)
     return redirect(template)
