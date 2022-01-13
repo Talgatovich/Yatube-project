@@ -10,6 +10,7 @@ from posts.models import Group, Post, Follow  # isort:skip
 from posts.tests.utils import divide  # isort:skip
 
 FIRST_PAGE_POSTS_COUNT = 10
+CREATE_POST_COUNT = 14
 OK = HTTPStatus.OK
 REDIRECT = HTTPStatus.FOUND
 
@@ -256,7 +257,7 @@ class PaginatorViewsTest(TestCase):
                 text=f'Тестовый пост{i} для теста',
                 author=self.user,
                 group=self.group
-            ) for i in range(1, 14)
+            ) for i in range(1, CREATE_POST_COUNT)
         ]
         Post.objects.bulk_create(posts)
         self.group_posts_count = len(posts)
@@ -267,7 +268,7 @@ class PaginatorViewsTest(TestCase):
                 text=f'Пост {i} другого автора',
                 author=self.second_user,
                 group=self.second_group
-            ) for i in range(1, 14)
+            ) for i in range(1, CREATE_POST_COUNT)
         ]
         Post.objects.bulk_create(posts)
         self.second_group_posts_count = len(posts)
@@ -339,7 +340,7 @@ class FollowViewsTest(TestCase):
         cls.first_user = User.objects.create_user(username='JustUser')
         cls.authorized_client.force_login(cls.first_user)
 
-        cls.favorite_author = Client()  # Создадим ибранного автора
+        cls.favorite_author = Client()  # Создаём ибранного автора
         cls.second_user = User.objects.create_user(username='FavoriteAuthor')
         cls.favorite_author.force_login(cls.second_user)
 
@@ -354,18 +355,20 @@ class FollowViewsTest(TestCase):
         )
 
         self.author_user_name = self.post.author
-        self.first_cnt_client = self.first_user.follower.count()
-        self.first_cnt_author = self.author_user_name.following.count()
-
-        #  Авторизованный клиент подписывается на автора
-        self.response = self.authorized_client.get(reverse(
-            'posts:profile_follow', args=((self.author_user_name,))))
 
     def test_authorized_client_can_create_follower(self):
         """
         Проверка, что авторизованный клиент
         может подписаться
         """
+        #  Считаем начальное количество подписок у пользователя и автора
+        first_cnt_client = self.first_user.follower.count()
+        first_cnt_author = self.author_user_name.following.count()
+        #  Авторизованный клиент подписывается на автора
+        response = self.authorized_client.get(reverse(
+            'posts:profile_follow', args=((self.author_user_name,))))
+        #  Считаем количество подписок у пользователя и автора
+        #  после подписки
         second_cnt_client = self.first_user.follower.count()
         second_cnt_author = self.author_user_name.following.count()
         exist = Follow.objects.filter(
@@ -373,75 +376,71 @@ class FollowViewsTest(TestCase):
         ).exists()
 
         self.assertTrue(exist)
-        self.assertEqual(self.response.status_code, REDIRECT)
-        self.assertEqual(second_cnt_client, self.first_cnt_client + 1)
-        self.assertEqual(second_cnt_author, self.first_cnt_author + 1)
+        self.assertEqual(response.status_code, REDIRECT)
+        self.assertEqual(second_cnt_client, first_cnt_client + 1)
+        self.assertEqual(second_cnt_author, first_cnt_author + 1)
 
     def test_authorized_client_can_delete_follower(self):
         """
         Проверка, что авторизованный клиент
         может отписаться
         """
+        Follow.objects.create(
+            user=self.first_user,
+            author=self.second_user
+        )
         #  Начальное количество подписок и подписчиков
-        second_cnt_client = self.first_user.follower.count()
-        second_cnt_author = self.author_user_name.following.count()
+        first_cnt_client = self.first_user.follower.count()
+        first_cnt_author = self.author_user_name.following.count()
         #  Отписались от автора
-        self.authorized_client.get(reverse(
+        response = self.authorized_client.get(reverse(
             'posts:profile_unfollow', args=((self.author_user_name,))))
         #  Конечное количество подписок и подписчиков
-        third_cnt_client = self.first_user.follower.count()
-        third_cnt_author = self.author_user_name.following.count()
+        second_cnt_client = self.first_user.follower.count()
+        second_cnt_author = self.author_user_name.following.count()
         exist = Follow.objects.filter(
             author=self.second_user, user=self.first_user
         ).exists()
 
         self.assertFalse(exist)
-        self.assertEqual(self.response.status_code, REDIRECT)
-        self.assertEqual(third_cnt_client, second_cnt_client - 1)
-        self.assertEqual(third_cnt_author, second_cnt_author - 1)
+        self.assertEqual(response.status_code, REDIRECT)
+        self.assertEqual(second_cnt_client, first_cnt_client - 1)
+        self.assertEqual(second_cnt_author, first_cnt_author - 1)
 
     def test_authorized_client_have_favorite_posts(self):
         """
         Проверяем, что у подписанного пользователя
         появляется пост в ленте
         """
-        form_data = {
-            'text': 'Новый избранный пост',
-            'author': self.second_user
-        }
-        self.favorite_author.post(
-            reverse('posts:post_create'),
-            data=form_data,
-            follow=True
+        Follow.objects.create(
+            user=self.first_user,
+            author=self.second_user
         )
-
+        new_post = Post.objects.create(
+            text='Новый избранный пост',
+            author=self.second_user
+        )
         response = self.authorized_client.get(
             reverse('posts:follow_index'))  # Перешли в ленту подписок
+        new_post_text = response.context['page_obj'][0].text
 
-        post_text = response.context['page_obj'][0].text
-
-        self.assertEqual(post_text, form_data['text'])
+        self.assertEqual(new_post_text, new_post.text)
 
     def test_another_client_doesnot_have_favorite_posts(self):
         """
         Проверяем, что у неподписанного пользователя
         пост в ленте не появляется
         """
-        form_data = {
-            'text': 'Еще один избранный пост',
-            'author': self.second_user
-        }
-        self.favorite_author.post(
-            reverse('posts:post_create'),
-            data=form_data,
-            follow=True
+        Follow.objects.create(
+            user=self.first_user,
+            author=self.second_user
         )
-
+        post = Post.objects.create(
+            text='Еще один избранный пост',
+            author=self.second_user
+        )
         response = self.another_client.get(
             reverse('posts:follow_index'))  # Перешли в ленту подписок
-        post_text = Post.objects.all().first().text
 
-        #  Проверили, что пост создался
-        self.assertEqual(post_text, form_data['text'])
         #  Проверили, что поста нет в ленте
-        self.assertNotContains(response, post_text)
+        self.assertNotContains(response, post)

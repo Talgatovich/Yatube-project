@@ -48,14 +48,10 @@ def profile(request, username):
     post_count = post_list.count()
     user = request.user
     page_obj = pagination(request, post_list, PAGE_COEF)
-    if user.is_authenticated:
-        authors = Follow.objects.filter(author=author, user=user)
-        if authors.exists():
-            following = True
-        else:
-            following = False
+    if user.is_authenticated and author.following.filter(user=user).exists():
+        following = True
     else:
-        following = None
+        following = False
     followers_count = author.following.count()
     context = {
         'post_count': post_count,

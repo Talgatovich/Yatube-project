@@ -126,8 +126,8 @@ class PostURLTests(TestCase):
                 self.assertEqual(response.status_code, value)
 
     def test_page_is_available_authorized_client_create(self):
-        """ Страницы создания, редактирования поста доступна
-         авторизованному  пользователю(он же автор)
+        """ Страницы создания, редактирования поста и лента
+        доступны авторизованному  пользователю(он же автор)
         """
         post_id = PostURLTests.post.id
         adress = [
